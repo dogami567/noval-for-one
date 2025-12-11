@@ -9,14 +9,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.31.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.23.25",
+    "lucide-react": "^0.556.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
-    "@google/genai": "^1.31.0",
-    "lucide-react": "^0.556.0",
-    "framer-motion": "^12.23.25"
+    "react-zoom-pan-pinch": "^3.7.0",
+    "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "@vercel/node": "^5.5.15",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
