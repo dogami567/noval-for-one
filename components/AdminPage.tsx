@@ -15,6 +15,7 @@ import {
   adminCreateTimelineEvent,
   adminUpdateTimelineEvent,
   adminDeleteTimelineEvent,
+  adminUploadImage,
 } from '../services/adminApi';
 
 type TabKey = 'locations' | 'characters' | 'chronicles';
@@ -45,6 +46,10 @@ const AdminPage: React.FC = () => {
 
   const [selectedChronicleId, setSelectedChronicleId] = useState<string | null>(null);
   const [chronicleForm, setChronicleForm] = useState<Partial<ChronicleEntry>>({});
+
+  const [locationImageFile, setLocationImageFile] = useState<File | null>(null);
+  const [characterImageFile, setCharacterImageFile] = useState<File | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const reloadData = async () => {
     setIsLoading(true);
@@ -164,10 +169,102 @@ const AdminPage: React.FC = () => {
     status: form.status ?? 'pending',
   });
 
-  const handleSaveLocation = async () => {
+  const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+
+  const readFileAsBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === 'string') {
+          const parts = result.split(',');
+          resolve(parts[1] || '');
+        } else {
+          resolve('');
+        }
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  const handleUploadLocationImage = async () => {
+    if (!selectedLocationId) {
+      setStatusMessage('请先保存以生成 ID');
+      return;
+    }
+    if (!locationImageFile) {
+      setStatusMessage('请先选择图片');
+      return;
+    }
+    if (locationImageFile.size > MAX_IMAGE_BYTES) {
+      setStatusMessage('图片过大，请压缩后再上传');
+      return;
+    }
+
+    setIsUploadingImage(true);
     setStatusMessage(null);
     try {
-      const payload = toLocationRow(locationForm);
+      const base64 = await readFileAsBase64(locationImageFile);
+      const publicUrl = await adminUploadImage({
+        entity: 'location',
+        id: selectedLocationId,
+        filename: locationImageFile.name,
+        contentType: locationImageFile.type,
+        base64,
+      });
+
+      const nextForm = { ...locationForm, imageUrl: publicUrl };
+      setLocationForm(nextForm);
+      await handleSaveLocation(nextForm);
+      setLocationImageFile(null);
+    } catch (err: any) {
+      setStatusMessage(`上传失败：${err?.message ?? '未知错误'}`);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleUploadCharacterImage = async () => {
+    if (!selectedCharacterId) {
+      setStatusMessage('请先保存以生成 ID');
+      return;
+    }
+    if (!characterImageFile) {
+      setStatusMessage('请先选择图片');
+      return;
+    }
+    if (characterImageFile.size > MAX_IMAGE_BYTES) {
+      setStatusMessage('图片过大，请压缩后再上传');
+      return;
+    }
+
+    setIsUploadingImage(true);
+    setStatusMessage(null);
+    try {
+      const base64 = await readFileAsBase64(characterImageFile);
+      const publicUrl = await adminUploadImage({
+        entity: 'character',
+        id: selectedCharacterId,
+        filename: characterImageFile.name,
+        contentType: characterImageFile.type,
+        base64,
+      });
+
+      const nextForm = { ...characterForm, imageUrl: publicUrl };
+      setCharacterForm(nextForm);
+      await handleSaveCharacter(nextForm);
+      setCharacterImageFile(null);
+    } catch (err: any) {
+      setStatusMessage(`上传失败：${err?.message ?? '未知错误'}`);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleSaveLocation = async (override?: Partial<Location>) => {
+    setStatusMessage(null);
+    try {
+      const payload = toLocationRow(override ?? locationForm);
       if (selectedLocationId) {
         await adminUpdateLocation(selectedLocationId, payload);
       } else {
@@ -195,10 +292,10 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  const handleSaveCharacter = async () => {
+  const handleSaveCharacter = async (override?: Partial<Character>) => {
     setStatusMessage(null);
     try {
-      const payload = toCharacterRow(characterForm);
+      const payload = toCharacterRow(override ?? characterForm);
       if (selectedCharacterId) {
         await adminUpdateCharacter(selectedCharacterId, payload);
       } else {
@@ -418,7 +515,26 @@ const AdminPage: React.FC = () => {
                       : 'hover:bg-slate-800 text-slate-200'
                   }`}
                 >
-                  {loc.name}
+                  <div className="flex items-center gap-3">
+                    {loc.imageUrl ? (
+                      <img
+                        src={loc.imageUrl}
+                        alt={loc.name}
+                        className="w-9 h-9 rounded-full object-cover bg-slate-800 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-sm font-semibold text-slate-300 shrink-0">
+                        {(loc.name || '?').slice(0, 1)}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{loc.name}</div>
+                      <div className="text-xs text-slate-400 truncate">
+                        {loc.type}
+                        {loc.status ? ` · ${loc.status}` : ''}
+                      </div>
+                    </div>
+                  </div>
                 </button>
               ))}
 
@@ -440,7 +556,25 @@ const AdminPage: React.FC = () => {
                       : 'hover:bg-slate-800 text-slate-200'
                   }`}
                 >
-                  {char.name}
+                  <div className="flex items-center gap-3">
+                    {char.imageUrl ? (
+                      <img
+                        src={char.imageUrl}
+                        alt={char.name}
+                        className="w-9 h-9 rounded-full object-cover bg-slate-800 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-sm font-semibold text-slate-300 shrink-0">
+                        {(char.name || '?').slice(0, 1)}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{char.name}</div>
+                      <div className="text-xs text-slate-400 truncate">
+                        {char.title || char.faction || ''}
+                      </div>
+                    </div>
+                  </div>
                 </button>
               ))}
 
@@ -468,6 +602,19 @@ const AdminPage: React.FC = () => {
           <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-6 h-[70vh] overflow-y-auto">
             {activeTab === 'locations' && (
               <div className="space-y-4">
+                <div className="rounded-xl border border-white/10 bg-slate-900/40 p-3">
+                  {locationForm.imageUrl ? (
+                    <img
+                      src={locationForm.imageUrl}
+                      alt={locationForm.name ?? '当前图片'}
+                      className="w-full max-h-52 object-contain rounded-lg bg-slate-950/60"
+                    />
+                  ) : (
+                    <div className="w-full h-40 rounded-lg bg-slate-800/60 flex items-center justify-center text-sm text-slate-400">
+                      暂无图片
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">名称</label>
@@ -543,6 +690,31 @@ const AdminPage: React.FC = () => {
                       onChange={(e) => setLocationForm({ ...locationForm, imageUrl: e.target.value })}
                       className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white"
                     />
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) =>
+                          setLocationImageFile(e.target.files?.[0] ?? null)
+                        }
+                        className="text-xs text-slate-200 file:mr-2 file:px-3 file:py-1 file:rounded file:border-0 file:bg-slate-700 file:text-white hover:file:bg-slate-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleUploadLocationImage}
+                        disabled={isUploadingImage || !selectedLocationId}
+                        className={`px-3 py-2 text-xs rounded font-semibold transition-colors ${
+                          isUploadingImage
+                            ? 'bg-slate-700 text-slate-300 cursor-wait'
+                            : 'bg-amber-600 hover:bg-amber-500 text-white'
+                        } ${!selectedLocationId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {isUploadingImage ? '上传中...' : '上传并替换'}
+                      </button>
+                    </div>
+                    {!selectedLocationId && (
+                      <div className="mt-1 text-xs text-slate-500">请先保存以生成 ID</div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">状态</label>
@@ -584,6 +756,19 @@ const AdminPage: React.FC = () => {
 
             {activeTab === 'characters' && (
               <div className="space-y-4">
+                <div className="rounded-xl border border-white/10 bg-slate-900/40 p-3">
+                  {characterForm.imageUrl ? (
+                    <img
+                      src={characterForm.imageUrl}
+                      alt={characterForm.name ?? '当前图片'}
+                      className="w-full max-h-52 object-contain rounded-lg bg-slate-950/60"
+                    />
+                  ) : (
+                    <div className="w-full h-40 rounded-lg bg-slate-800/60 flex items-center justify-center text-sm text-slate-400">
+                      暂无图片
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs text-slate-400 mb-1">名称</label>
@@ -627,6 +812,31 @@ const AdminPage: React.FC = () => {
                       }
                       className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white"
                     />
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) =>
+                          setCharacterImageFile(e.target.files?.[0] ?? null)
+                        }
+                        className="text-xs text-slate-200 file:mr-2 file:px-3 file:py-1 file:rounded file:border-0 file:bg-slate-700 file:text-white hover:file:bg-slate-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleUploadCharacterImage}
+                        disabled={isUploadingImage || !selectedCharacterId}
+                        className={`px-3 py-2 text-xs rounded font-semibold transition-colors ${
+                          isUploadingImage
+                            ? 'bg-slate-700 text-slate-300 cursor-wait'
+                            : 'bg-amber-600 hover:bg-amber-500 text-white'
+                        } ${!selectedCharacterId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {isUploadingImage ? '上传中...' : '上传并替换'}
+                      </button>
+                    </div>
+                    {!selectedCharacterId && (
+                      <div className="mt-1 text-xs text-slate-500">请先保存以生成 ID</div>
+                    )}
                   </div>
                 </div>
 

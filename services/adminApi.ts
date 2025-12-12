@@ -1,5 +1,13 @@
 type AdminRow = Record<string, unknown>;
 
+export interface AdminUploadPayload {
+  entity: 'location' | 'character';
+  id: string;
+  filename: string;
+  contentType: string;
+  base64: string;
+}
+
 const getAdminToken = (): string => {
   if (typeof window === 'undefined') return '';
   return window.localStorage.getItem('adminEditToken') ?? '';
@@ -72,3 +80,20 @@ export const adminDeleteTimelineEvent = (id: string) =>
     method: 'DELETE',
   });
 
+export const adminUploadImage = async (payload: AdminUploadPayload): Promise<string> => {
+  const res = await fetch('/api/admin/upload', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-admin-token': getAdminToken(),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(json?.message || res.statusText);
+  }
+
+  return String(json.publicUrl || '');
+};
