@@ -215,8 +215,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     if (!llmRes.ok) {
-      const errText = await llmRes.text().catch(() => '');
-      console.error('[chat] provider error', llmRes.status, errText.slice(0, 200));
+      console.error('[chat] provider error', llmRes.status);
       res.status(500).json({ text: '档案馆暂时无法回应，请稍后再试。' });
       return;
     }
