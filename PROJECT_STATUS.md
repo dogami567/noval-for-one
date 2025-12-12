@@ -1,17 +1,17 @@
 # Project Status: Project Dogami (Her Universe)
 
-**Current Phase**: Locked Visibility & Discovery (World Progression)
+**Current Phase**: Supabase Foundation (SoT Migration)
 **Last Updated**: 2025-12-12
-**Current Instruction**: `spec/004-locked-visibility-final.md`
+**Current Instruction**: `spec/005-supabase-foundation-final.md`
 
 ## 🚀 Active Task
-- **Task**: Locked locations gating + character discovery stages
+- **Task**: Supabase schema + RLS + services migration
 - **Owner**: Execution Agent
 - **Status**: **Pending Execution**
 - **Context**: 
-    - Filtering to locked locations must show no champions.
-    - Add discoveryStage (hidden/rumor/revealed) and global list rules.
-    - Prepare event schema for V2 narrative-driven world state.
+    - Create public lore tables + private world_state/world_events.
+    - Add RLS (anon read only) and Storage buckets.
+    - Refactor frontend to load data via services.
 
 ## 📋 Backlog
 1.  [ ] **Module A**: Connect Pins to Drawer.
