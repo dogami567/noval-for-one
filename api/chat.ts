@@ -174,6 +174,11 @@ const MAX_MATCHED_CHARACTERS = 4;
 const MAX_MATCHED_PLACES = 4;
 const MAX_RELATED_STORIES = 6;
 
+const CANDIDATE_CACHE_TTL_MS = 2 * 60 * 1000;
+let candidateCache:
+  | { expiresAt: number; characters: CharacterMatchRow[]; places: PlaceMatchRow[] }
+  | null = null;
+
 const compactText = (value: unknown): string =>
   String(value ?? '')
     .replace(/\s+/g, ' ')
@@ -181,6 +186,12 @@ const compactText = (value: unknown): string =>
 
 const clipText = (value: unknown, maxChars: number): string => {
   const text = compactText(value);
+  if (text.length <= maxChars) return text;
+  return text.slice(0, Math.max(0, maxChars - 1)).trimEnd() + '…';
+};
+
+const truncatePreserveNewlines = (value: unknown, maxChars: number): string => {
+  const text = String(value ?? '');
   if (text.length <= maxChars) return text;
   return text.slice(0, Math.max(0, maxChars - 1)).trimEnd() + '…';
 };
@@ -197,6 +208,38 @@ const scoreNeedlesInText = (needles: Array<string | null | undefined>, haystack:
   return best;
 };
 
+const getContextCandidates = async (): Promise<{
+  characters: CharacterMatchRow[];
+  places: PlaceMatchRow[];
+}> => {
+  if (!supabaseAdmin) return { characters: [], places: [] };
+
+  const now = Date.now();
+  if (candidateCache && candidateCache.expiresAt > now) {
+    return { characters: candidateCache.characters, places: candidateCache.places };
+  }
+
+  const [{ data: characters, error: characterError }, { data: places, error: placeError }] =
+    await Promise.all([
+      supabaseAdmin.from('characters').select('id,name,aliases').limit(500),
+      supabaseAdmin.from('places').select('id,name').limit(800),
+    ]);
+
+  if (characterError) throw characterError;
+  if (placeError) throw placeError;
+
+  const normalizedCharacters = (characters as CharacterMatchRow[]) ?? [];
+  const normalizedPlaces = (places as PlaceMatchRow[]) ?? [];
+
+  candidateCache = {
+    expiresAt: now + CANDIDATE_CACHE_TTL_MS,
+    characters: normalizedCharacters,
+    places: normalizedPlaces,
+  };
+
+  return { characters: normalizedCharacters, places: normalizedPlaces };
+};
+
 const buildContextPack = async (rawUserText: string): Promise<string> => {
   if (!supabaseAdmin) return '';
 
@@ -204,14 +247,7 @@ const buildContextPack = async (rawUserText: string): Promise<string> => {
   if (haystack.length === 0) return '';
 
   try {
-    const [{ data: characterCandidates, error: characterError }, { data: placeCandidates, error: placeError }] =
-      await Promise.all([
-        supabaseAdmin.from('characters').select('id,name,aliases').limit(500),
-        supabaseAdmin.from('places').select('id,name').limit(800),
-      ]);
-
-    if (characterError) throw characterError;
-    if (placeError) throw placeError;
+    const { characters: characterCandidates, places: placeCandidates } = await getContextCandidates();
 
     const matchedCharacterIds = ((characterCandidates as CharacterMatchRow[]) ?? [])
       .map((row) => ({
@@ -353,7 +389,7 @@ const buildContextPack = async (rawUserText: string): Promise<string> => {
       }
     }
 
-    return clipText(lines.join('\n'), MAX_CONTEXT_PACK_CHARS);
+    return truncatePreserveNewlines(lines.join('\n'), MAX_CONTEXT_PACK_CHARS);
   } catch (error: any) {
     console.error('[chat] context pack error', error?.message ?? 'unknown');
     return '';

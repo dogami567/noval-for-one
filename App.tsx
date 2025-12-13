@@ -42,12 +42,9 @@ function App() {
 
         if (cancelled) return;
 
-        const hasDbData =
-          dbLocations.length > 0 && dbCharacters.length > 0 && dbChronicles.length > 0;
-
-        const nextLocations = hasDbData ? dbLocations : fallbackMapPlaces;
-        const nextCharacters = hasDbData ? dbCharacters : CHARACTERS;
-        const nextChronicles = hasDbData ? dbChronicles : CHRONICLES;
+        const nextLocations = dbLocations.length > 0 ? dbLocations : fallbackMapPlaces;
+        const nextCharacters = dbCharacters.length > 0 ? dbCharacters : CHARACTERS;
+        const nextChronicles = dbChronicles.length > 0 ? dbChronicles : CHRONICLES;
 
         setLocations(nextLocations);
         setCharacters(nextCharacters);

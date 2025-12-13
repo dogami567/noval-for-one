@@ -141,16 +141,15 @@ const CharacterSidebar: React.FC<CharacterSidebarProps> = ({ character, onClose,
                    <h3 className="text-lg font-serif">相关故事</h3>
                 </div>
                 
-                <div className="grid gap-4">
-                   {character.stories?.map((story, idx) => (
-                      <div key={idx} className="bg-slate-900/50 border border-slate-800 p-4 rounded hover:border-cyan-500/30 transition-colors cursor-pointer group">
-                         <h4 className="text-cyan-400 font-bold mb-1 group-hover:text-cyan-300">{story.title}</h4>
-                         <p className="text-slate-500 text-sm italic">"{story.excerpt}"</p>
-                      </div>
-                   ))}
-                   {(!character.stories || character.stories.length === 0) && (
-                      <div className="text-slate-600 italic text-sm">暂无记录的故事。</div>
-                   )}
+                <div className="text-sm text-slate-400 leading-6">
+                  相关短篇已迁移到设定集系统，请前往{' '}
+                  <a
+                    className="text-amber-300 underline"
+                    href={`/character/${encodeURIComponent(character.slug)}`}
+                  >
+                    英雄详情页
+                  </a>{' '}
+                  查看。
                 </div>
              </div>
 

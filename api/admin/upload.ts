@@ -44,6 +44,10 @@ const CONTENT_TYPE_TO_EXT: Record<string, string> = {
   'image/webp': 'webp',
 };
 
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.status(405).json({ message: '仅支持 POST 请求' });
@@ -64,6 +68,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!entity || !id || !filename || !contentType || !base64) {
     res.status(400).json({ message: '参数缺失' });
+    return;
+  }
+
+  const objectId = String(id).trim();
+  if (!UUID_REGEX.test(objectId)) {
+    res.status(400).json({ message: 'id 必须是 uuid' });
+    return;
+  }
+  if (objectId.includes('/') || objectId.includes('\\')) {
+    res.status(400).json({ message: 'id 不合法' });
     return;
   }
 
@@ -89,10 +103,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const fileName =
     entity === 'character' ? `portrait.${ext}` : `cover.${ext}`;
-  const path = `${id}/${fileName}`;
+  const path = `${objectId}/${fileName}`;
 
   try {
     const buffer = Buffer.from(String(base64), 'base64');
+    if (buffer.length <= 0) {
+      res.status(400).json({ message: '图片内容为空' });
+      return;
+    }
+    if (buffer.length > MAX_IMAGE_BYTES) {
+      res.status(400).json({ message: '图片过大（> 2MB），请压缩后再上传' });
+      return;
+    }
     const { error: uploadError } = await supabaseAdmin.storage
       .from(bucket)
       .upload(path, buffer, {

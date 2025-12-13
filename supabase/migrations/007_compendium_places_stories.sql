@@ -123,6 +123,8 @@ create table if not exists public.story_characters (
   primary key (story_id, character_id)
 );
 
+create index if not exists story_characters_character_id_idx on public.story_characters(character_id);
+
 alter table public.story_characters enable row level security;
 do $$
 begin
@@ -147,6 +149,8 @@ create table if not exists public.story_places (
   created_at timestamptz not null default now(),
   primary key (story_id, place_id)
 );
+
+create index if not exists story_places_place_id_idx on public.story_places(place_id);
 
 alter table public.story_places enable row level security;
 do $$

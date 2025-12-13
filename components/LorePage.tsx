@@ -56,12 +56,27 @@ const LorePage: React.FC = () => {
     return map;
   }, [filteredPlaces]);
 
-  const renderTree = (parentKey: string, depth: number) => {
+  const MAX_TREE_DEPTH = 12;
+
+  const renderTree = (parentKey: string, depth: number, visited: Set<string>) => {
+    if (depth > MAX_TREE_DEPTH) {
+      return (
+        <div className="text-xs text-slate-500 px-4 py-2 rounded-lg border border-white/10 bg-slate-950/30">
+          已达到最大展开层级（可能存在异常层级配置）
+        </div>
+      );
+    }
+
     const children = byParent.get(parentKey) ?? [];
     if (children.length === 0) return null;
     return (
       <div className={depth === 0 ? 'space-y-2' : 'space-y-1'}>
-        {children.map((p) => (
+        {children.map((p) => {
+          const isCycle = visited.has(p.id);
+          const nextVisited = new Set(visited);
+          nextVisited.add(p.id);
+
+          return (
           <div key={p.id} className="space-y-1">
             <a
               href={`/place/${encodeURIComponent(p.slug)}`}
@@ -81,14 +96,22 @@ const LorePage: React.FC = () => {
               <ChevronRight className="text-slate-500 group-hover:text-amber-300 shrink-0" size={18} />
             </a>
             <div className="pl-5 border-l border-white/5">
-              {renderTree(p.id, depth + 1)}
+              {isCycle ? (
+                <div className="text-xs text-rose-400 px-4 py-2 rounded-lg border border-rose-500/20 bg-rose-500/10">
+                  检测到循环引用（parent_id 配置可能有误），已停止展开
+                </div>
+              ) : (
+                renderTree(p.id, depth + 1, nextVisited)
+              )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
 
+  const hasQuery = query.trim().length > 0;
   const continents = filteredPlaces.filter((p) => p.kind === 'continent');
   const hasContinents = continents.length > 0;
 
@@ -131,7 +154,48 @@ const LorePage: React.FC = () => {
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-6">
-                {hasContinents ? (
+                {hasQuery ? (
+                  filteredPlaces.length > 0 ? (
+                    <div className="space-y-2">
+                      {filteredPlaces
+                        .slice()
+                        .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+                        .slice(0, 50)
+                        .map((p) => (
+                          <a
+                            key={p.id}
+                            href={`/place/${encodeURIComponent(p.slug)}`}
+                            className="group flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-slate-950/40 hover:bg-slate-950/70 px-4 py-3 transition-colors"
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-xs uppercase tracking-widest text-slate-500 shrink-0">
+                                  {p.kind}
+                                </span>
+                                <span className="text-slate-100 font-semibold truncate">{p.name}</span>
+                              </div>
+                              {p.description && (
+                                <div className="text-xs text-slate-400 mt-1 line-clamp-2">
+                                  {p.description}
+                                </div>
+                              )}
+                            </div>
+                            <ChevronRight
+                              className="text-slate-500 group-hover:text-amber-300 shrink-0"
+                              size={18}
+                            />
+                          </a>
+                        ))}
+                      {filteredPlaces.length > 50 && (
+                        <div className="text-xs text-slate-500 px-4 pt-2">
+                          已匹配 {filteredPlaces.length} 条，仅展示前 50 条
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-slate-400">未找到匹配地点/地区。</div>
+                  )
+                ) : hasContinents ? (
                   <div className="space-y-3">
                     {continents.map((c) => (
                       <div key={c.id} className="space-y-2">
@@ -153,7 +217,7 @@ const LorePage: React.FC = () => {
                           />
                         </a>
                         <div className="pl-5 border-l border-white/5">
-                          {renderTree(c.id, 1)}
+                          {renderTree(c.id, 1, new Set([c.id]))}
                         </div>
                       </div>
                     ))}
@@ -197,4 +261,3 @@ const LorePage: React.FC = () => {
 };
 
 export default LorePage;
-
